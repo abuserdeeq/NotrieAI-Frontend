@@ -254,6 +254,13 @@ export default function AdminSettingsPage() {
               </p>
             )}
           </div>
+          {updateSettings.isError && (
+            <p className="mt-4 text-sm text-[hsl(var(--destructive))]">
+              {updateSettings.error instanceof Error
+                ? updateSettings.error.message
+                : 'Could not save. Please try again.'}
+            </p>
+          )}
         </section>
 
         {/* Theme */}
@@ -316,6 +323,16 @@ export default function AdminSettingsPage() {
             {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             Save theme
           </button>
+          {updateSettings.isError && (
+            <p className="mt-3 text-sm text-[hsl(var(--destructive))]">
+              {updateSettings.error instanceof Error
+                ? updateSettings.error.message
+                : 'Could not save theme. Please try again.'}
+            </p>
+          )}
+          {updateSettings.isSuccess && (
+            <p className="mt-3 text-sm text-[hsl(var(--chart-3))]">Theme saved and applied.</p>
+          )}
         </section>
 
         {/* Users */}
@@ -452,4 +469,4 @@ export default function AdminSettingsPage() {
       </main>
     </div>
   );
-}
+                }
