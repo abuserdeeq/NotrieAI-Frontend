@@ -2,10 +2,12 @@ import { type FormEvent, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { LogoMark } from '@/components/brand';
+import { useSiteSettings } from '@/hooks/use-site-settings';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 export default function LoginPage() {
+  const { siteName, siteTagline } = useSiteSettings();
   const { login } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState('');
@@ -36,7 +38,7 @@ export default function LoginPage() {
             <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]">
               NotrieAI
             </p>
-            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Welcome back. Log in to continue.</p>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{siteTagline}</p>
           </div>
         </div>
 
