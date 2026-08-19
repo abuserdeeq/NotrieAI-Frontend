@@ -18,8 +18,17 @@ import LoginPage from '@/pages/login';
 import SignupPage from '@/pages/signup';
 import AdminSettingsPage from '@/pages/admin-settings';
 import { AuthProvider, useAuth } from '@/lib/auth';
-import { explainRequest, getHealth, getPublicSettings, type ExplainResult } from '@/lib/api';
+import {
+  deleteHistoryItem,
+  explainRequest,
+  getHealth,
+  getHistory,
+  getPublicSettings,
+  type ExplainResult,
+  type AnalysisHistoryItem,
+} from '@/lib/api';
 import { applyThemeFromSettings } from '@/lib/theme';
+import { useSiteSettings } from '@/hooks/use-site-settings';
 import {
   AlertCircle,
   ArrowRight,
@@ -33,6 +42,9 @@ import {
   Info,
   Lightbulb,
   ListChecks,
+  Menu,
+  History,
+  Trash2,
   Loader2,
   LogOut,
   RotateCcw,
@@ -321,6 +333,8 @@ function LoadingResult() {
 function Home() {
   const { token, user, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const { siteName, siteTagline } = useSiteSettings();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -346,6 +360,24 @@ function Home() {
     retry: false,
     staleTime: 60_000,
   });
+
+  const historyQuery = useQuery({
+    queryKey: ['analysis-history'],
+    queryFn: () => getHistory(token as string),
+    enabled: Boolean(token),
+    staleTime: 0,
+  });
+
+  const deleteHistory = useMutation({
+    mutationFn: (historyId: string) => deleteHistoryItem(token as string, historyId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analysis-history'] }),
+  });
+
+  const openHistoryItem = (item: AnalysisHistoryItem) => {
+    setResult(item.result);
+    setHistoryOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const textCount = text.length;
   const isBusy = explain.isPending;
@@ -388,7 +420,7 @@ function Home() {
       }
       setValidationError('');
       setResult(null);
-      explain.mutate({ text: cleanedText }, { onSuccess: (data) => setResult(data) });
+      explain.mutate({ text: cleanedText }, { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } });
       return;
     }
 
@@ -402,7 +434,7 @@ function Home() {
       const imageBase64 = await fileToBase64(imageFile);
       explain.mutate(
         { text: text.trim() || undefined, imageBase64, imageMimeType: imageFile.type },
-        { onSuccess: (data) => setResult(data) },
+        { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } },
       );
     } catch {
       setValidationError('Could not read that image. Please try another file.');
@@ -425,8 +457,8 @@ function Home() {
         <div className="flex items-center gap-3">
           <LogoMark />
           <div>
-            <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]">NotrieAI</p>
-            <p className="block max-w-[180px] font-mono text-[8px] leading-3 uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:max-w-none sm:text-[9px] sm:tracking-[0.16em]">Understand anything in seconds.</p>
+            <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]"> {siteName}</p>
+            <p className="block max-w-[180px] font-mono text-[8px] leading-3 uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:max-w-none sm:text-[9px] sm:tracking-[0.16em]">{siteTagline}</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -435,6 +467,16 @@ function Home() {
             <span>{health.isLoading ? 'Checking guide' : health.isError ? 'Guide offline' : 'Guide is ready'}</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              aria-label="Open analysis history"
+              aria-expanded={historyOpen}
+              title="Analysis history"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+            >
+              <Menu size={17} />
+            </button>
             {user?.is_admin && (
               <Link
                 href="/admin/settings"
@@ -459,6 +501,86 @@ function Home() {
           </div>
         </div>
       </header>
+
+      {historyOpen && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Analysis history">
+          <button
+            type="button"
+            aria-label="Close analysis history"
+            className="absolute inset-0 bg-black/25"
+            onClick={() => setHistoryOpen(false)}
+          />
+          <aside className="absolute right-0 top-0 flex h-full w-full max-w-[390px] flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[-18px_0_50px_hsl(213_28%_18%_/_0.12)]">
+            <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <History size={17} className="text-[hsl(var(--primary))]" />
+                  <h2 className="font-serif text-xl text-[hsl(var(--primary))]">Analysis history</h2>
+                </div>
+                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Your completed analyses</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                aria-label="Close history"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-[hsl(var(--primary))]"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {historyQuery.isLoading ? (
+                <p className="p-3 text-sm text-[hsl(var(--muted-foreground))]">Loading history…</p>
+              ) : historyQuery.data?.length ? (
+                <div className="space-y-2">
+                  {historyQuery.data.map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
+                      <button
+                        type="button"
+                        onClick={() => openHistoryItem(item)}
+                        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] rounded-lg"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
+                            {item.input_type === 'image' ? 'Photo analysis' : 'Text analysis'}
+                          </span>
+                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                            {new Date(item.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-2 text-sm font-semibold text-[hsl(var(--foreground))]">
+                          {item.input_text?.trim() || `${VERDICT_META[item.result.verdict].label} analysis`}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
+                          {item.result.summary}
+                        </p>
+                      </button>
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          aria-label="Delete this analysis"
+                          title="Delete"
+                          disabled={deleteHistory.isPending}
+                          onClick={() => deleteHistory.mutate(item.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)_/_0.08)] disabled:opacity-50"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-5 text-center">
+                  <History size={22} className="mx-auto text-[hsl(var(--muted-foreground))]" />
+                  <p className="mt-3 text-sm font-semibold">No analyses yet</p>
+                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Your completed analyses will appear here.</p>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      )}
 
       <main className="mx-auto w-full max-w-[1240px] px-5 pb-20 pt-10 sm:px-8 sm:pt-16 lg:px-10 lg:pt-20">
         {result ? (
@@ -651,7 +773,7 @@ function Home() {
         )}
       </main>
       <footer className="mx-auto flex w-full max-w-[1240px] flex-col gap-2 border-t border-[hsl(var(--border))] px-5 py-6 text-xs text-[hsl(var(--muted-foreground))] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-        <p>NotrieAI · Understanding should not be a privilege.</p>
+        <p>{siteName} · Understanding should not be a privilege.</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.12em]">Text + Photo</p>
       </footer>
     </div>
