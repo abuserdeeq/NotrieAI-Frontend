@@ -66,6 +66,22 @@ export type UserAdminOut = {
   created_at: string;
 };
 
+export type HistoryItem = {
+  id: string;
+  verdict: ExplainResult['verdict'];
+  summary: string;
+  input_preview: string | null;
+  had_image: boolean;
+  created_at: string;
+};
+
+export type HistoryDetail = ExplainResult & {
+  id: string;
+  input_preview: string | null;
+  had_image: boolean;
+  created_at: string;
+};
+
 // ---------------------------------------------------------------------
 // Explain
 // ---------------------------------------------------------------------
@@ -136,23 +152,22 @@ export function adminDeleteUser(token: string, userId: string) {
   return apiFetch<void>(`/api/admin/users/${userId}`, { method: 'DELETE' }, token);
 }
 
+// ---------------------------------------------------------------------
+// History - each user's own saved analyses
+// ---------------------------------------------------------------------
 
-export type AnalysisHistoryItem = {
-  id: string;
-  input_type: 'text' | 'image';
-  input_text: string | null;
-  result: ExplainResult;
-  created_at: string;
-};
-
-export function getHistory(token: string) {
-  return apiFetch<AnalysisHistoryItem[]>('/api/history', {}, token);
+export function getHistoryList(token: string | null) {
+  return apiFetch<HistoryItem[]>('/api/history', {}, token);
 }
 
-export function getHistoryItem(token: string, historyId: string) {
-  return apiFetch<AnalysisHistoryItem>(`/api/history/${historyId}`, {}, token);
+export function getHistoryDetail(token: string | null, id: string) {
+  return apiFetch<HistoryDetail>(`/api/history/${id}`, {}, token);
 }
 
-export function deleteHistoryItem(token: string, historyId: string) {
-  return apiFetch<void>(`/api/history/${historyId}`, { method: 'DELETE' }, token);
+export function deleteHistoryItem(token: string | null, id: string) {
+  return apiFetch<void>(`/api/history/${id}`, { method: 'DELETE' }, token);
+}
+
+export function clearHistory(token: string | null) {
+  return apiFetch<void>('/api/history', { method: 'DELETE' }, token);
 }
