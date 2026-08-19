@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getPublicSettings } from '@/lib/api';
 
-const DEFAULT_SITE_NAME = 'NotrieAI';
+const DEFAULT_SITE_NAME = 'Rotryai';
 const DEFAULT_SITE_TAGLINE = 'Understand anything in seconds.';
 
 export function useSiteSettings() {
