@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type FormEvent,
   type ReactNode,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -10,7 +11,15 @@ import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tansta
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { LogoMark } from '@/components/brand';
+import { AdminRoute, ProtectedRoute } from '@/components/protected-route';
 import NotFound from '@/pages/not-found';
+import LoginPage from '@/pages/login';
+import SignupPage from '@/pages/signup';
+import AdminSettingsPage from '@/pages/admin-settings';
+import { AuthProvider, useAuth } from '@/lib/auth';
+import { explainRequest, getHealth, getPublicSettings, type ExplainResult } from '@/lib/api';
+import { applyThemeFromSettings } from '@/lib/theme';
 import {
   AlertCircle,
   ArrowRight,
@@ -25,13 +34,16 @@ import {
   Lightbulb,
   ListChecks,
   Loader2,
+  LogOut,
   RotateCcw,
+  Settings,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
 import {
+  Link,
   Route,
   Switch,
   useLocation,
@@ -40,22 +52,7 @@ import {
 
 const queryClient = new QueryClient();
 
-// Set VITE_API_BASE_URL in the frontend's env to point at the deployed
-// Python/FastAPI backend, e.g. https://notrieai.onrender.com
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
-
 type Mode = 'text' | 'image';
-
-type ConfusingTerm = { term: string; explanation: string };
-
-type ExplainResult = {
-  verdict: 'safe' | 'suspicious' | 'likely_scam' | 'needs_clarification';
-  verdict_reason: string;
-  summary: string;
-  key_points: string[];
-  confusing_terms: ConfusingTerm[];
-  what_you_should_do: string[];
-};
 
 const VERDICT_META: Record<
   ExplainResult['verdict'],
@@ -83,30 +80,6 @@ const VERDICT_META: Record<
   },
 };
 
-async function explainRequest(input: {
-  text?: string;
-  imageBase64?: string;
-  imageMimeType?: string;
-}): Promise<ExplainResult> {
-  const res = await fetch(`${API_BASE_URL}/api/explain`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      text: input.text || undefined,
-      image_base64: input.imageBase64 || undefined,
-      image_mime_type: input.imageMimeType || undefined,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const message =
-      (typeof body?.detail === 'string' && body.detail) ||
-      'We could not analyse that right now. Please try again in a moment.';
-    throw new Error(message);
-  }
-  return res.json();
-}
-
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -117,16 +90,6 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error('Could not read that image.'));
     reader.readAsDataURL(file);
   });
-}
-
-function LogoMark() {
-  return (
-    <div className="relative flex h-10 w-10 items-center justify-center rounded-[13px] bg-[hsl(var(--accent))] text-[hsl(var(--primary))] shadow-[0_8px_22px_hsl(39_93%_62%_/_0.22)]" aria-hidden="true">
-      <span className="absolute h-5 w-5 rounded-full border-[1.5px] border-[hsl(var(--primary))]" />
-      <span className="absolute h-2.5 w-2.5 rounded-full bg-[hsl(var(--primary))]" />
-      <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />
-    </div>
-  );
 }
 
 function SectionHeading({
@@ -356,6 +319,8 @@ function LoadingResult() {
 }
 
 function Home() {
+  const { token, user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -365,14 +330,19 @@ function Home() {
   const [dismissedError, setDismissedError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const explain = useMutation({ mutationFn: explainRequest });
+  const explain = useMutation({
+    mutationFn: (input: { text?: string; imageBase64?: string; imageMimeType?: string }) =>
+      explainRequest(input, token),
+    onError: (error: Error) => {
+      if ('status' in error && (error as { status?: number }).status === 401) {
+        logout();
+        setLocation('/login');
+      }
+    },
+  });
   const health = useQuery({
     queryKey: ['health'],
-    queryFn: async () => {
-      const res = await fetch(`${API_BASE_URL}/api/health`);
-      if (!res.ok) throw new Error('offline');
-      return res.json() as Promise<{ status: string }>;
-    },
+    queryFn: getHealth,
     retry: false,
     staleTime: 60_000,
   });
@@ -459,9 +429,34 @@ function Home() {
             <p className="block max-w-[180px] font-mono text-[8px] leading-3 uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:max-w-none sm:text-[9px] sm:tracking-[0.16em]">Understand anything in seconds.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]" data-testid="status-connection">
-          <span className={`h-2 w-2 rounded-full ${health.isLoading ? 'bg-[hsl(var(--accent))]' : health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--chart-3))]'}`} />
-          <span className="hidden sm:inline">{health.isLoading ? 'Checking guide' : health.isError ? 'Guide offline' : 'Guide is ready'}</span>
+        <div className="flex items-center gap-4">
+          <div className="hidden items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:flex" data-testid="status-connection">
+            <span className={`h-2 w-2 rounded-full ${health.isLoading ? 'bg-[hsl(var(--accent))]' : health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--chart-3))]'}`} />
+            <span>{health.isLoading ? 'Checking guide' : health.isError ? 'Guide offline' : 'Guide is ready'}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {user?.is_admin && (
+              <Link
+                href="/admin/settings"
+                aria-label="Admin settings"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--primary))]"
+              >
+                <Settings size={16} />
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                logout();
+                setLocation('/login');
+              }}
+              aria-label="Log out"
+              title={user?.email}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))]"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -669,7 +664,18 @@ function Router() {
     // survives a page crash.
     <RoutedErrorBoundary>
       <Switch>
-        <Route path="/" component={Home} />
+        <Route path="/login" component={LoginPage} />
+        <Route path="/signup" component={SignupPage} />
+        <Route path="/admin/settings">
+          <AdminRoute>
+            <AdminSettingsPage />
+          </AdminRoute>
+        </Route>
+        <Route path="/">
+          <ProtectedRoute>
+            <Home />
+          </ProtectedRoute>
+        </Route>
         <Route component={NotFound} />
       </Switch>
     </RoutedErrorBoundary>
@@ -681,15 +687,34 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 
+/** Applies the admin's chosen theme colors as soon as the app loads - runs
+ * on every page, including /login, since branding shouldn't wait for auth. */
+function ThemeLoader() {
+  const { data } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: getPublicSettings,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    applyThemeFromSettings(data);
+  }, [data]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <ThemeLoader />
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
