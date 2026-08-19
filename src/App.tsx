@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { QueryClient, QueryClientProvider, useMutation, useQuery } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -20,15 +20,17 @@ import AdminSettingsPage from '@/pages/admin-settings';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import {
   deleteHistoryItem,
+  clearHistory,
   explainRequest,
   getHealth,
-  getHistory,
+  getHistoryDetail,
+  getHistoryList,
   getPublicSettings,
   type ExplainResult,
-  type AnalysisHistoryItem,
+  type HistoryItem,
 } from '@/lib/api';
 import { applyThemeFromSettings } from '@/lib/theme';
-import { useSiteSettings } from '@/hooks/use-site-settings';
+import { useSiteBranding } from '@/hooks/use-site-branding';
 import {
   AlertCircle,
   ArrowRight,
@@ -38,13 +40,11 @@ import {
   Clipboard,
   Copy,
   FileText,
+  History as HistoryIcon,
   Image as ImageIcon,
   Info,
   Lightbulb,
   ListChecks,
-  Menu,
-  History,
-  Trash2,
   Loader2,
   LogOut,
   RotateCcw,
@@ -52,6 +52,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react';
 import {
@@ -150,9 +151,11 @@ function VerdictBanner({ verdict, reason }: { verdict: ExplainResult['verdict'];
 function ResultView({
   result,
   onStartOver,
+  siteName,
 }: {
   result: ExplainResult;
   onStartOver: () => void;
+  siteName: string;
 }) {
   const [copied, setCopied] = useState(false);
   const copyText = useMemo(
@@ -290,7 +293,7 @@ function ResultView({
         </div>
       </div>
       <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-        Rotryai helps you understand text and messages. It does not replace advice from a qualified professional.
+        {siteName} helps you understand text and messages. It does not replace advice from a qualified professional.
       </p>
     </section>
   );
@@ -332,9 +335,8 @@ function LoadingResult() {
 
 function Home() {
   const { token, user, logout } = useAuth();
+  const { siteName, siteTagline } = useSiteBranding();
   const [, setLocation] = useLocation();
-  const { siteName, siteTagline } = useSiteSettings();
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -342,6 +344,7 @@ function Home() {
   const [result, setResult] = useState<ExplainResult | null>(null);
   const [validationError, setValidationError] = useState('');
   const [dismissedError, setDismissedError] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const explain = useMutation({
@@ -360,24 +363,6 @@ function Home() {
     retry: false,
     staleTime: 60_000,
   });
-
-  const historyQuery = useQuery({
-    queryKey: ['analysis-history'],
-    queryFn: () => getHistory(token as string),
-    enabled: Boolean(token),
-    staleTime: 0,
-  });
-
-  const deleteHistory = useMutation({
-    mutationFn: (historyId: string) => deleteHistoryItem(token as string, historyId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analysis-history'] }),
-  });
-
-  const openHistoryItem = (item: AnalysisHistoryItem) => {
-    setResult(item.result);
-    setHistoryOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
 
   const textCount = text.length;
   const isBusy = explain.isPending;
@@ -411,7 +396,7 @@ function Home() {
     if (mode === 'text') {
       const cleanedText = text.trim();
       if (cleanedText.length < 20) {
-        setValidationError('Please paste at least 20 characters so Rotryai has enough context to help.');
+        setValidationError(`Please paste at least 20 characters so ${siteName} has enough context to help.`);
         return;
       }
       if (cleanedText.length > 30000) {
@@ -420,7 +405,7 @@ function Home() {
       }
       setValidationError('');
       setResult(null);
-      explain.mutate({ text: cleanedText }, { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } });
+      explain.mutate({ text: cleanedText }, { onSuccess: (data) => setResult(data) });
       return;
     }
 
@@ -434,7 +419,7 @@ function Home() {
       const imageBase64 = await fileToBase64(imageFile);
       explain.mutate(
         { text: text.trim() || undefined, imageBase64, imageMimeType: imageFile.type },
-        { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } },
+        { onSuccess: (data) => setResult(data) },
       );
     } catch {
       setValidationError('Could not read that image. Please try another file.');
@@ -457,8 +442,8 @@ function Home() {
         <div className="flex items-center gap-3">
           <LogoMark />
           <div>
-            <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]"> {siteName}</p>
-            <p className="block max-w-[180px] font-mono text-[8px] leading-3 uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:max-w-none sm:text-[9px] sm:tracking-[0.16em]">{siteTagline}</p>
+            <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]">{siteName}</p>
+            <p className="block max-w-[180px] font-mono text-[8px] leading-3 uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))] sm:max-w-none sm:text-[9px] sm:tracking-[0.16em]">Understand anything in seconds.</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -469,13 +454,13 @@ function Home() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setHistoryOpen(true)}
+              onClick={() => setShowHistory(true)}
               aria-label="Open analysis history"
-              aria-expanded={historyOpen}
-              title="Analysis history"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--primary))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+              title="History"
+              data-testid="button-open-history"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--primary))]"
             >
-              <Menu size={17} />
+              <HistoryIcon size={16} />
             </button>
             {user?.is_admin && (
               <Link
@@ -502,89 +487,9 @@ function Home() {
         </div>
       </header>
 
-      {historyOpen && (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Analysis history">
-          <button
-            type="button"
-            aria-label="Close analysis history"
-            className="absolute inset-0 bg-black/25"
-            onClick={() => setHistoryOpen(false)}
-          />
-          <aside className="absolute right-0 top-0 flex h-full w-full max-w-[390px] flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-[-18px_0_50px_hsl(213_28%_18%_/_0.12)]">
-            <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <History size={17} className="text-[hsl(var(--primary))]" />
-                  <h2 className="font-serif text-xl text-[hsl(var(--primary))]">Analysis history</h2>
-                </div>
-                <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Your completed analyses</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setHistoryOpen(false)}
-                aria-label="Close history"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] text-[hsl(var(--primary))]"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              {historyQuery.isLoading ? (
-                <p className="p-3 text-sm text-[hsl(var(--muted-foreground))]">Loading history…</p>
-              ) : historyQuery.data?.length ? (
-                <div className="space-y-2">
-                  {historyQuery.data.map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-[hsl(var(--border))] bg-[hsl(var(--background))] p-3">
-                      <button
-                        type="button"
-                        onClick={() => openHistoryItem(item)}
-                        className="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] rounded-lg"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-[hsl(var(--muted-foreground))]">
-                            {item.input_type === 'image' ? 'Photo analysis' : 'Text analysis'}
-                          </span>
-                          <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
-                            {new Date(item.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="mt-2 line-clamp-2 text-sm font-semibold text-[hsl(var(--foreground))]">
-                          {item.input_text?.trim() || `${VERDICT_META[item.result.verdict].label} analysis`}
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-                          {item.result.summary}
-                        </p>
-                      </button>
-                      <div className="mt-2 flex justify-end">
-                        <button
-                          type="button"
-                          aria-label="Delete this analysis"
-                          title="Delete"
-                          disabled={deleteHistory.isPending}
-                          onClick={() => deleteHistory.mutate(item.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)_/_0.08)] disabled:opacity-50"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-5 text-center">
-                  <History size={22} className="mx-auto text-[hsl(var(--muted-foreground))]" />
-                  <p className="mt-3 text-sm font-semibold">No analyses yet</p>
-                  <p className="mt-1 text-xs leading-5 text-[hsl(var(--muted-foreground))]">Your completed analyses will appear here.</p>
-                </div>
-              )}
-            </div>
-          </aside>
-        </div>
-      )}
-
       <main className="mx-auto w-full max-w-[1240px] px-5 pb-20 pt-10 sm:px-8 sm:pt-16 lg:px-10 lg:pt-20">
         {result ? (
-          <ResultView result={result} onStartOver={startOver} />
+          <ResultView result={result} onStartOver={startOver} siteName={siteName} />
         ) : isBusy ? (
           <LoadingResult />
         ) : (
@@ -601,7 +506,7 @@ function Home() {
                   <span className="text-[hsl(var(--chart-3))]">Easy to act on.</span>
                 </h1>
                 <p className="mt-7 max-w-[510px] text-[17px] leading-7 text-[hsl(var(--muted-foreground))]">
-                  Paste a message or upload a screenshot. Rotryai tells you what it means, whether it's safe, and what to do next.
+                  Paste a message or upload a screenshot. {siteName} tells you what it means, whether it's safe, and what to do next.
                 </p>
               </div>
               <div className="fade-up fade-up-delay-1 hidden lg:block">
@@ -609,7 +514,7 @@ function Home() {
                   <div className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-[hsl(var(--primary))]">
                     <ShieldCheck size={18} />
                   </div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">The Rotryai promise</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">The Notrie promise</p>
                   <p className="mt-5 font-serif text-[27px] leading-[1.1] tracking-[-0.035em] text-[hsl(var(--primary))]">
                     No jargon.
                     <br />
@@ -773,9 +678,199 @@ function Home() {
         )}
       </main>
       <footer className="mx-auto flex w-full max-w-[1240px] flex-col gap-2 border-t border-[hsl(var(--border))] px-5 py-6 text-xs text-[hsl(var(--muted-foreground))] sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
-        <p>{siteName} · Understanding should not be a privilege.</p>
+        <p>{siteName} · {siteTagline}</p>
         <p className="font-mono text-[10px] uppercase tracking-[0.12em]">Text + Photo</p>
       </footer>
+
+      <HistoryPanel
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        token={token}
+        onOpenEntry={(entry) => {
+          setDismissedError(false);
+          setResult(entry);
+        }}
+      />
+    </div>
+  );
+}
+
+function HistoryPanel({
+  open,
+  onClose,
+  token,
+  onOpenEntry,
+}: {
+  open: boolean;
+  onClose: () => void;
+  token: string | null;
+  onOpenEntry: (result: ExplainResult) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState('');
+
+  const historyQuery = useQuery({
+    queryKey: ['history'],
+    queryFn: () => getHistoryList(token),
+    enabled: open,
+    staleTime: 10_000,
+  });
+
+  const deleteOne = useMutation({
+    mutationFn: (id: string) => deleteHistoryItem(token, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] }),
+  });
+
+  const clearAll = useMutation({
+    mutationFn: () => clearHistory(token),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] }),
+  });
+
+  const handleOpenEntry = async (item: HistoryItem) => {
+    setLoadError('');
+    setOpeningId(item.id);
+    try {
+      const detail = await getHistoryDetail(token, item.id);
+      onOpenEntry(detail);
+      onClose();
+    } catch {
+      setLoadError('Could not open that entry. Please try again.');
+    } finally {
+      setOpeningId(null);
+    }
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm('Delete your entire analysis history? This cannot be undone.')) {
+      clearAll.mutate();
+    }
+  };
+
+  // Escape closes the panel, same as clicking the backdrop.
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const items = historyQuery.data ?? [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Analysis history">
+      <button
+        type="button"
+        aria-label="Close history"
+        onClick={onClose}
+        className="absolute inset-0 bg-[hsl(213_28%_10%_/_0.45)]"
+      />
+      <div className="fade-up relative flex h-full w-full max-w-[380px] flex-col border-l border-[hsl(var(--border))] bg-[hsl(var(--card))] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[hsl(var(--border))] px-5 py-4">
+          <div className="flex items-center gap-2">
+            <HistoryIcon size={18} className="text-[hsl(var(--primary))]" />
+            <h2 className="font-serif text-lg text-[hsl(var(--primary))]">History</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close history"
+            data-testid="button-close-history"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))]"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex items-center justify-between px-5 py-3 text-xs text-[hsl(var(--muted-foreground))]">
+          <span data-testid="text-history-count">
+            {historyQuery.isLoading ? 'Loading…' : `${items.length} saved`}
+          </span>
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              disabled={clearAll.isPending}
+              data-testid="button-clear-history"
+              className="inline-flex items-center gap-1 font-semibold text-[hsl(var(--destructive))] disabled:opacity-60"
+            >
+              {clearAll.isPending ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+              Clear all
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 pb-6">
+          {historyQuery.isError && (
+            <p className="px-2 py-6 text-sm text-[hsl(var(--destructive))]" role="alert">
+              Could not load your history. Please try again.
+            </p>
+          )}
+          {loadError && (
+            <p className="px-2 pb-3 text-sm text-[hsl(var(--destructive))]" role="alert">
+              {loadError}
+            </p>
+          )}
+          {!historyQuery.isLoading && !historyQuery.isError && items.length === 0 && (
+            <p className="px-2 py-6 text-sm text-[hsl(var(--muted-foreground))]">
+              Nothing analysed yet. Everything you analyse will show up here so you can read it again later.
+            </p>
+          )}
+          <ul className="space-y-2">
+            {items.map((item) => {
+              const meta = VERDICT_META[item.verdict];
+              const Icon = meta.icon;
+              return (
+                <li
+                  key={item.id}
+                  data-testid={`row-history-${item.id}`}
+                  className="rounded-2xl border border-[hsl(var(--border))] p-3 transition-colors hover:border-[hsl(var(--primary))]"
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEntry(item)}
+                    disabled={openingId === item.id}
+                    data-testid={`button-open-history-${item.id}`}
+                    className="block w-full text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.className}`}>
+                        <Icon size={10} />
+                        {meta.label}
+                      </span>
+                      <span className="text-[11px] text-[hsl(var(--muted-foreground))]">
+                        {new Date(item.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-[hsl(var(--foreground))]">
+                      {item.input_preview || (item.had_image ? 'Photo analysis' : item.summary)}
+                    </p>
+                    {openingId === item.id && (
+                      <span className="mt-1.5 inline-flex items-center gap-1 text-xs text-[hsl(var(--muted-foreground))]">
+                        <Loader2 size={11} className="animate-spin" /> Opening…
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteOne.mutate(item.id)}
+                    disabled={deleteOne.isPending}
+                    aria-label="Delete this entry"
+                    data-testid={`button-delete-history-${item.id}`}
+                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[hsl(var(--destructive))] disabled:opacity-60"
+                  >
+                    <Trash2 size={11} /> Delete
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </div>
     </div>
   );
 }
@@ -820,6 +915,12 @@ function ThemeLoader() {
 
   useEffect(() => {
     applyThemeFromSettings(data);
+  }, [data]);
+
+  useEffect(() => {
+    if (data?.site_name?.trim()) {
+      document.title = data.site_name.trim();
+    }
   }, [data]);
 
   return null;
