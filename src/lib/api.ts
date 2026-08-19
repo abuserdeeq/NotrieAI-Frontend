@@ -135,3 +135,24 @@ export function adminUpdateUser(token: string, userId: string, isAdmin: boolean)
 export function adminDeleteUser(token: string, userId: string) {
   return apiFetch<void>(`/api/admin/users/${userId}`, { method: 'DELETE' }, token);
 }
+
+
+export type AnalysisHistoryItem = {
+  id: string;
+  input_type: 'text' | 'image';
+  input_text: string | null;
+  result: ExplainResult;
+  created_at: string;
+};
+
+export function getHistory(token: string) {
+  return apiFetch<AnalysisHistoryItem[]>('/api/history', {}, token);
+}
+
+export function getHistoryItem(token: string, historyId: string) {
+  return apiFetch<AnalysisHistoryItem>(`/api/history/${historyId}`, {}, token);
+}
+
+export function deleteHistoryItem(token: string, historyId: string) {
+  return apiFetch<void>(`/api/history/${historyId}`, { method: 'DELETE' }, token);
+}
