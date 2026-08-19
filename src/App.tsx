@@ -290,7 +290,7 @@ function ResultView({
         </div>
       </div>
       <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-5 text-[hsl(var(--muted-foreground))]">
-        NotrieAI helps you understand text and messages. It does not replace advice from a qualified professional.
+        Rotryai helps you understand text and messages. It does not replace advice from a qualified professional.
       </p>
     </section>
   );
@@ -411,7 +411,7 @@ function Home() {
     if (mode === 'text') {
       const cleanedText = text.trim();
       if (cleanedText.length < 20) {
-        setValidationError('Please paste at least 20 characters so NotrieAI has enough context to help.');
+        setValidationError('Please paste at least 20 characters so Rotryai has enough context to help.');
         return;
       }
       if (cleanedText.length > 30000) {
@@ -601,7 +601,7 @@ function Home() {
                   <span className="text-[hsl(var(--chart-3))]">Easy to act on.</span>
                 </h1>
                 <p className="mt-7 max-w-[510px] text-[17px] leading-7 text-[hsl(var(--muted-foreground))]">
-                  Paste a message or upload a screenshot. NotrieAI tells you what it means, whether it's safe, and what to do next.
+                  Paste a message or upload a screenshot. Rotryai tells you what it means, whether it's safe, and what to do next.
                 </p>
               </div>
               <div className="fade-up fade-up-delay-1 hidden lg:block">
@@ -609,7 +609,7 @@ function Home() {
                   <div className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-[hsl(var(--accent))] text-[hsl(var(--primary))]">
                     <ShieldCheck size={18} />
                   </div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">The Notrie promise</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-[hsl(var(--muted-foreground))]">The Rotryai promise</p>
                   <p className="mt-5 font-serif text-[27px] leading-[1.1] tracking-[-0.035em] text-[hsl(var(--primary))]">
                     No jargon.
                     <br />
