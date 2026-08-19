@@ -22,6 +22,7 @@ import {
   type UserAdminOut,
 } from '@/lib/api';
 import { applyTheme, type ThemeColors } from '@/lib/theme';
+import { DEFAULT_SITE_NAME, DEFAULT_SITE_TAGLINE, useSiteBranding } from '@/hooks/use-site-branding';
 
 const THEME_FIELDS: { key: keyof ThemeColors; label: string }[] = [
   { key: 'background', label: 'Background' },
@@ -109,6 +110,7 @@ function ColorField({
 
 export default function AdminSettingsPage() {
   const { token, user } = useAuth();
+  const { siteName } = useSiteBranding();
   const queryClient = useQueryClient();
 
   const settingsQuery = useQuery({
@@ -125,15 +127,13 @@ export default function AdminSettingsPage() {
   const [themeLight, setThemeLight] = useState<ThemeColors>(EMPTY_THEME);
   const [themeDark, setThemeDark] = useState<ThemeColors>(EMPTY_THEME);
   const [activeThemeTab, setActiveThemeTab] = useState<'light' | 'dark'>('light');
+  const [siteNameField, setSiteNameField] = useState('');
+  const [siteTaglineField, setSiteTaglineField] = useState('');
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
-  const [siteName, setSiteName] = useState('Rotryai');
-  const [siteTagline, setSiteTagline] = useState('Understand anything in seconds.');
 
   useEffect(() => {
     if (!settingsQuery.data) return;
-    setSiteName(settingsQuery.data.site_name ?? 'Rotryai');
-    setSiteTagline(settingsQuery.data.site_tagline ?? 'Understand anything in seconds.');
     try {
       if (settingsQuery.data.theme_light) {
         setThemeLight({ ...EMPTY_THEME, ...JSON.parse(settingsQuery.data.theme_light) });
@@ -148,6 +148,8 @@ export default function AdminSettingsPage() {
     } catch {
       // ignore malformed stored theme
     }
+    setSiteNameField(settingsQuery.data.site_name ?? '');
+    setSiteTaglineField(settingsQuery.data.site_tagline ?? '');
   }, [settingsQuery.data]);
 
   const updateSettings = useMutation({
@@ -173,7 +175,6 @@ export default function AdminSettingsPage() {
 
   const openaiEnabled = (settingsQuery.data?.provider_openai_enabled ?? 'true') === 'true';
   const geminiEnabled = (settingsQuery.data?.provider_gemini_enabled ?? 'true') === 'true';
-  const [themeSaved, setThemeSaved] = useState(false);
 
   const handleSaveTheme = () => {
     updateSettings.mutate(
@@ -182,9 +183,19 @@ export default function AdminSettingsPage() {
         onSuccess: () => {
           applyTheme(themeLight, themeDark);
           queryClient.invalidateQueries({ queryKey: ['public-settings'] });
-          setThemeSaved(true);
-          setTimeout(() => setThemeSaved(false), 3000);
         },
+      },
+    );
+  };
+
+  const handleSaveBranding = () => {
+    updateSettings.mutate(
+      {
+        site_name: siteNameField.trim() || DEFAULT_SITE_NAME,
+        site_tagline: siteTaglineField.trim() || DEFAULT_SITE_TAGLINE,
+      },
+      {
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['public-settings'] }),
       },
     );
   };
@@ -226,41 +237,6 @@ export default function AdminSettingsPage() {
       </header>
 
       <main className="mx-auto w-full max-w-[1000px] space-y-6 px-5 pb-20 sm:px-8">
-        {/* Site branding */}
-        <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
-          <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">Site branding</h2>
-          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-            Change the public site name and tagline without touching the code.
-          </p>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label>
-              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Site name</span>
-              <input
-                value={siteName}
-                onChange={(event) => setSiteName(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
-              />
-            </label>
-            <label>
-              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Site tagline</span>
-              <input
-                value={siteTagline}
-                onChange={(event) => setSiteTagline(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            onClick={() => updateSettings.mutate({ site_name: siteName.trim(), site_tagline: siteTagline.trim() })}
-            disabled={updateSettings.isPending || !siteName.trim()}
-            className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))] disabled:opacity-70"
-          >
-            {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save branding
-          </button>
-        </section>
-
         {/* AI Providers */}
         <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
           <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">AI Providers</h2>
@@ -292,7 +268,7 @@ export default function AdminSettingsPage() {
             </div>
             {!openaiEnabled && !geminiEnabled && (
               <p className="text-sm text-[hsl(var(--destructive))]">
-                Both providers are off - Rotryai can't explain anything right now.
+                Both providers are off - {siteName} can't explain anything right now.
               </p>
             )}
           </div>
@@ -303,6 +279,43 @@ export default function AdminSettingsPage() {
                 : 'Could not save. Please try again.'}
             </p>
           )}
+        </section>
+
+        {/* Branding */}
+        <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
+          <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">Branding</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            The name and tagline shown across the app - login, signup, the browser tab, and the footer.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Site name</span>
+              <input
+                value={siteNameField}
+                onChange={(event) => setSiteNameField(event.target.value)}
+                placeholder={DEFAULT_SITE_NAME}
+                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[hsl(var(--primary))]"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Tagline</span>
+              <input
+                value={siteTaglineField}
+                onChange={(event) => setSiteTaglineField(event.target.value)}
+                placeholder={DEFAULT_SITE_TAGLINE}
+                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] outline-none focus:border-[hsl(var(--primary))]"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveBranding}
+            disabled={updateSettings.isPending}
+            className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))] disabled:opacity-70"
+          >
+            {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Save branding
+          </button>
         </section>
 
         {/* Theme */}
@@ -372,7 +385,7 @@ export default function AdminSettingsPage() {
                 : 'Could not save theme. Please try again.'}
             </p>
           )}
-          {updateSettings.isSuccess && themeSaved && (
+          {updateSettings.isSuccess && (
             <p className="mt-3 text-sm text-[hsl(var(--chart-3))]">Theme saved and applied.</p>
           )}
         </section>
