@@ -36,7 +36,7 @@ export default function LoginPage() {
           <LogoMark />
           <div>
             <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]">
-              NotrieAI
+              {siteName}
             </p>
             <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{siteTagline}</p>
           </div>

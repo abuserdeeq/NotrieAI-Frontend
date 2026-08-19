@@ -127,12 +127,12 @@ export default function AdminSettingsPage() {
   const [activeThemeTab, setActiveThemeTab] = useState<'light' | 'dark'>('light');
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
-  const [siteName, setSiteName] = useState('NotrieAI');
+  const [siteName, setSiteName] = useState('Rotryai');
   const [siteTagline, setSiteTagline] = useState('Understand anything in seconds.');
 
   useEffect(() => {
     if (!settingsQuery.data) return;
-    setSiteName(settingsQuery.data.site_name ?? 'NotrieAI');
+    setSiteName(settingsQuery.data.site_name ?? 'Rotryai');
     setSiteTagline(settingsQuery.data.site_tagline ?? 'Understand anything in seconds.');
     try {
       if (settingsQuery.data.theme_light) {
@@ -173,6 +173,7 @@ export default function AdminSettingsPage() {
 
   const openaiEnabled = (settingsQuery.data?.provider_openai_enabled ?? 'true') === 'true';
   const geminiEnabled = (settingsQuery.data?.provider_gemini_enabled ?? 'true') === 'true';
+  const [themeSaved, setThemeSaved] = useState(false);
 
   const handleSaveTheme = () => {
     updateSettings.mutate(
@@ -181,6 +182,8 @@ export default function AdminSettingsPage() {
         onSuccess: () => {
           applyTheme(themeLight, themeDark);
           queryClient.invalidateQueries({ queryKey: ['public-settings'] });
+          setThemeSaved(true);
+          setTimeout(() => setThemeSaved(false), 3000);
         },
       },
     );
@@ -289,7 +292,7 @@ export default function AdminSettingsPage() {
             </div>
             {!openaiEnabled && !geminiEnabled && (
               <p className="text-sm text-[hsl(var(--destructive))]">
-                Both providers are off - NotrieAI can't explain anything right now.
+                Both providers are off - Rotryai can't explain anything right now.
               </p>
             )}
           </div>
@@ -369,7 +372,7 @@ export default function AdminSettingsPage() {
                 : 'Could not save theme. Please try again.'}
             </p>
           )}
-          {updateSettings.isSuccess && (
+          {updateSettings.isSuccess && themeSaved && (
             <p className="mt-3 text-sm text-[hsl(var(--chart-3))]">Theme saved and applied.</p>
           )}
         </section>
