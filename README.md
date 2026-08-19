@@ -1,11 +1,24 @@
 # NotrieAI Frontend
 
-React + Vite frontend for NotrieAI. Paste text or upload a photo/screenshot,
-and get a plain-language explanation with a safety verdict, key points,
-confusing terms explained, and next steps.
+React + Vite frontend for NotrieAI. Requires an account: sign up or log in,
+then paste text or upload a photo/screenshot to get a plain-language
+explanation with a safety verdict, key points, confusing terms explained,
+and next steps.
 
-This talks to the separate Python/FastAPI backend (see the `notrie-explain-backend`
+This talks to the separate Python/FastAPI backend (see the `notrie-explain`
 repo) via the `VITE_API_BASE_URL` environment variable.
+
+## Pages
+
+- `/login`, `/signup` — no account needed to view; creating one signs you in.
+- `/` — the main explain flow. Requires login.
+- `/admin/settings` — AI provider toggles, theme colors, user management,
+  and an open-ended key/value editor for anything else. Requires an admin
+  account (see the backend's `ADMIN_EMAIL` env var).
+
+Branding/theme colors are fetched from the backend (`/api/settings/public`)
+and applied at runtime, so an admin can change the app's look from the
+Settings page without a redeploy.
 
 ## Local setup
 
