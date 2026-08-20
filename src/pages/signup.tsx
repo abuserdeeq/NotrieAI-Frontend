@@ -2,13 +2,13 @@ import { type FormEvent, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { LogoMark } from '@/components/brand';
+import { useSiteSettings } from '@/hooks/use-site-settings';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
-import { useSiteBranding } from '@/hooks/use-site-branding';
 
 export default function SignupPage() {
+  const { siteName, siteTagline } = useSiteSettings();
   const { signup } = useAuth();
-  const { siteName } = useSiteBranding();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +42,7 @@ export default function SignupPage() {
             <p className="font-serif text-[22px] font-semibold tracking-[-0.03em] text-[hsl(var(--primary))]">
               {siteName}
             </p>
-            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">Create your account.</p>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">{siteTagline}</p>
           </div>
         </div>
 
