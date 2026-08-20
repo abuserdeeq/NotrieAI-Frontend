@@ -1,6 +1,6 @@
-# NotrieAI Frontend
+# Rotryai Frontend
 
-React + Vite frontend for NotrieAI. Requires an account: sign up or log in,
+React + Vite frontend for Rotryai. Requires an account: sign up or log in,
 then paste text or upload a photo/screenshot to get a plain-language
 explanation with a safety verdict, key points, confusing terms explained,
 and next steps.
@@ -43,13 +43,13 @@ Outputs static files to `dist/`.
 
 ## Deploy (Render Static Site)
 
-1. Push this repo to its own GitHub repo (e.g. `NotrieAI-frontend`).
+1. Push this repo to its own GitHub repo (e.g. `Rotryai-frontend`).
 2. On Render: New → Static Site → connect the repo.
 3. Settings:
    - Build command: `npm install && npm run build`
    - Publish directory: `dist`
 4. Add environment variable `VITE_API_BASE_URL` set to your backend's
-   Render URL (e.g. `https://notrieai.onrender.com`) — required at
+   Render URL (e.g. `https://your-backend-name.onrender.com`) — required at
    **build** time since Vite bakes it into the static files.
 
 You can also deploy this to Vercel or Netlify the same way (same build
