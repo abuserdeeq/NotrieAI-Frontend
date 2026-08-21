@@ -333,11 +333,69 @@ function LoadingResult() {
   );
 }
 
+function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel = 'Yes',
+  cancelLabel = 'Cancel',
+  isBusy = false,
+  destructive = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  isBusy?: boolean;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-5" role="dialog" aria-modal="true" aria-label={title}>
+      <button type="button" aria-label="Dismiss" className="absolute inset-0 bg-black/35" onClick={onCancel} />
+      <div className="relative w-full max-w-[380px] rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 shadow-[0_20px_60px_hsl(213_28%_18%_/_0.18)]">
+        <h2 className="font-serif text-xl text-[hsl(var(--primary))]">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">{description}</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isBusy}
+            className="inline-flex h-10 items-center justify-center rounded-full border border-[hsl(var(--border))] px-4 text-sm font-semibold text-[hsl(var(--foreground))] transition-colors hover:bg-[hsl(var(--secondary))] disabled:opacity-50"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isBusy}
+            className={`inline-flex h-10 items-center justify-center gap-2 rounded-full px-4 text-sm font-bold transition-transform hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60 ${
+              destructive
+                ? 'bg-[hsl(var(--destructive))] text-white'
+                : 'bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))]'
+            }`}
+          >
+            {isBusy && <Loader2 size={15} className="animate-spin" />}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Home() {
   const { token, user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const { siteName, siteTagline } = useSiteSettings();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -373,7 +431,10 @@ function Home() {
 
   const deleteHistory = useMutation({
     mutationFn: (historyId: string) => deleteHistoryItem(token as string, historyId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['analysis-history'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['analysis-history'] });
+      setConfirmDeleteId(null);
+    },
   });
 
   const openHistoryItem = (item: AnalysisHistoryItem) => {
@@ -491,10 +552,7 @@ function Home() {
             )}
             <button
               type="button"
-              onClick={() => {
-                logout();
-                setLocation('/login');
-              }}
+              onClick={() => setConfirmLogoutOpen(true)}
               aria-label="Log out"
               title={user?.email}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--primary))] transition-colors hover:border-[hsl(var(--destructive))] hover:text-[hsl(var(--destructive))]"
@@ -563,8 +621,7 @@ function Home() {
                           type="button"
                           aria-label="Delete this analysis"
                           title="Delete"
-                          disabled={deleteHistory.isPending}
-                          onClick={() => deleteHistory.mutate(item.id)}
+                          onClick={() => setConfirmDeleteId(item.id)}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)_/_0.08)] disabled:opacity-50"
                         >
                           <Trash2 size={14} />
@@ -584,6 +641,35 @@ function Home() {
           </aside>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmLogoutOpen}
+        title="Log out?"
+        description="You'll need to sign in again to use your account."
+        confirmLabel="Yes, log out"
+        destructive
+        onCancel={() => setConfirmLogoutOpen(false)}
+        onConfirm={() => {
+          setConfirmLogoutOpen(false);
+          logout();
+          setLocation('/login');
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        title="Delete this analysis?"
+        description="This can't be undone."
+        confirmLabel="Yes, delete"
+        destructive
+        isBusy={deleteHistory.isPending}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            deleteHistory.mutate(confirmDeleteId);
+          }
+        }}
+      />
 
       <main className="mx-auto w-full max-w-[1240px] px-5 pb-20 pt-10 sm:px-8 sm:pt-16 lg:px-10 lg:pt-20">
         {result ? (
