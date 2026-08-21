@@ -23,20 +23,59 @@ const VAR_MAP: Record<keyof ThemeColors, string> = {
 };
 
 function toCssDeclarations(colors: Partial<ThemeColors>): string {
-  return (Object.keys(VAR_MAP) as (keyof ThemeColors)[])
+  const declarations = (Object.keys(VAR_MAP) as (keyof ThemeColors)[])
     .filter((key) => Boolean(colors[key]))
-    .map((key) => `${VAR_MAP[key]}: ${colors[key]};`)
-    .join(' ');
+    .map((key) => `${VAR_MAP[key]}: ${colors[key]};`);
+
+  // Keep the editor simple (8 semantic colors) while making the whole UI
+  // follow the same palette: cards, borders, inputs, sidebar, ring and charts
+  // all inherit from the selected semantic colors.
+  if (colors.background) {
+    declarations.push('--card: var(--background);', '--popover: var(--background);');
+  }
+  if (colors.secondary) {
+    declarations.push(
+      '--border: var(--secondary);',
+      '--card-border: var(--secondary);',
+      '--popover-border: var(--secondary);',
+      '--input: var(--secondary);',
+      '--muted: var(--secondary);',
+      '--sidebar-accent: var(--secondary);',
+    );
+  }
+  if (colors.secondary_foreground) {
+    declarations.push(
+      '--card-foreground: var(--secondary-foreground);',
+      '--popover-foreground: var(--secondary-foreground);',
+      '--muted-foreground: var(--secondary-foreground);',
+    );
+  }
+  if (colors.primary) {
+    declarations.push('--sidebar: var(--primary);', '--chart-1: var(--primary);');
+  }
+  if (colors.primary_foreground) {
+    declarations.push(
+      '--sidebar-foreground: var(--primary-foreground);',
+      '--sidebar-primary-foreground: var(--primary-foreground);',
+    );
+  }
+  if (colors.accent) {
+    declarations.push(
+      '--ring: var(--accent);',
+      '--sidebar-primary: var(--accent);',
+      '--chart-2: var(--accent);',
+      '--chart-3: var(--accent);',
+    );
+  }
+  if (colors.accent_foreground) {
+    declarations.push('--sidebar-accent-foreground: var(--accent-foreground);');
+  }
+
+  return declarations.join(' ');
 }
 
-/**
- * Injects a <style> tag with `:root { ... }` and `.dark { ... }` blocks
- * that override the base theme variables from index.css. Runs after the
- * stylesheet in source order, so it wins the cascade without needing
- * `!important` or inline styles (which would incorrectly apply to both
- * light and dark mode at once).
- */
-export function applyTheme(light?: Partial<ThemeColors> | null, dark?: Partial<ThemeColors> | null) {
+/** Applies one global admin-selected color palette to the whole app. */
+export function applyTheme(theme?: Partial<ThemeColors> | null) {
   let styleEl = document.getElementById(STYLE_ELEMENT_ID) as HTMLStyleElement | null;
   if (!styleEl) {
     styleEl = document.createElement('style');
@@ -44,27 +83,22 @@ export function applyTheme(light?: Partial<ThemeColors> | null, dark?: Partial<T
     document.head.appendChild(styleEl);
   }
 
-  const lightCss = light ? `:root { ${toCssDeclarations(light)} }` : '';
-  const darkCss = dark ? `.dark { ${toCssDeclarations(dark)} }` : '';
-  styleEl.textContent = `${lightCss}\n${darkCss}`;
+  // Passing null/undefined removes all dynamic overrides and restores the
+  // original palette defined in index.css.
+  styleEl.textContent = theme ? `:root { ${toCssDeclarations(theme)} }` : '';
 }
 
-/** Parses the JSON-encoded theme_light/theme_dark values from the
- * /api/settings/public response and applies them. Safe to call with
- * missing/malformed values - it just skips what it can't parse. */
+/** Parses the JSON-encoded theme_light value from public settings. */
 export function applyThemeFromSettings(settings: Record<string, string> | undefined) {
   if (!settings) return;
-  let light: Partial<ThemeColors> | null = null;
-  let dark: Partial<ThemeColors> | null = null;
   try {
-    if (settings.theme_light) light = JSON.parse(settings.theme_light);
+    if (settings.theme_light) {
+      applyTheme(JSON.parse(settings.theme_light));
+    } else {
+      applyTheme(null);
+    }
   } catch {
-    // ignore malformed stored theme
+    // If the stored theme is malformed, keep the built-in palette.
+    applyTheme(null);
   }
-  try {
-    if (settings.theme_dark) dark = JSON.parse(settings.theme_dark);
-  } catch {
-    // ignore malformed stored theme
-  }
-  if (light || dark) applyTheme(light, dark);
 }
