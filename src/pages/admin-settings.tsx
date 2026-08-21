@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Trash2,
   Users as UsersIcon,
+  X,
 } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LogoMark } from '@/components/brand';
@@ -34,15 +35,15 @@ const THEME_FIELDS: { key: keyof ThemeColors; label: string }[] = [
   { key: 'accent_foreground', label: 'Accent text' },
 ];
 
-const EMPTY_THEME: ThemeColors = {
-  background: '',
-  foreground: '',
-  primary: '',
-  primary_foreground: '',
-  secondary: '',
-  secondary_foreground: '',
-  accent: '',
-  accent_foreground: '',
+const DEFAULT_THEME: ThemeColors = {
+  background: '42 42% 96%',
+  foreground: '213 28% 18%',
+  primary: '202 34% 20%',
+  primary_foreground: '42 42% 96%',
+  secondary: '38 36% 91%',
+  secondary_foreground: '213 28% 24%',
+  accent: '39 93% 62%',
+  accent_foreground: '213 28% 18%',
 };
 
 // Settings under these prefixes get their own dedicated UI above; anything
@@ -122,9 +123,8 @@ export default function AdminSettingsPage() {
     enabled: Boolean(token),
   });
 
-  const [themeLight, setThemeLight] = useState<ThemeColors>(EMPTY_THEME);
-  const [themeDark, setThemeDark] = useState<ThemeColors>(EMPTY_THEME);
-  const [activeThemeTab, setActiveThemeTab] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<ThemeColors>(DEFAULT_THEME);
+  const [themeConfirmAction, setThemeConfirmAction] = useState<'save' | 'reset' | null>(null);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [siteName, setSiteName] = useState('Rotryai');
@@ -140,14 +140,9 @@ export default function AdminSettingsPage() {
     setMonthlyQuota(settingsQuery.data.quota_monthly_analyses ?? '300');
     try {
       if (settingsQuery.data.theme_light) {
-        setThemeLight({ ...EMPTY_THEME, ...JSON.parse(settingsQuery.data.theme_light) });
-      }
-    } catch {
-      // ignore malformed stored theme
-    }
-    try {
-      if (settingsQuery.data.theme_dark) {
-        setThemeDark({ ...EMPTY_THEME, ...JSON.parse(settingsQuery.data.theme_dark) });
+        setTheme({ ...DEFAULT_THEME, ...JSON.parse(settingsQuery.data.theme_light) });
+      } else {
+        setTheme(DEFAULT_THEME);
       }
     } catch {
       // ignore malformed stored theme
@@ -182,16 +177,32 @@ export default function AdminSettingsPage() {
 
   const handleSaveTheme = () => {
     updateSettings.mutate(
-      { theme_light: JSON.stringify(themeLight), theme_dark: JSON.stringify(themeDark) },
+      { theme_light: JSON.stringify(theme) },
       {
         onSuccess: () => {
-          applyTheme(themeLight, themeDark);
+          applyTheme(theme);
           queryClient.invalidateQueries({ queryKey: ['public-settings'] });
           setThemeSavedFlash(true);
           setTimeout(() => setThemeSavedFlash(false), 2500);
         },
       },
     );
+  };
+
+  const handleResetTheme = () => {
+    updateSettings.reset();
+    adminDeleteSetting(token as string, 'theme_light')
+      .then(() => {
+        setTheme(DEFAULT_THEME);
+        applyTheme(null);
+        queryClient.invalidateQueries({ queryKey: ['admin-settings'] });
+        queryClient.invalidateQueries({ queryKey: ['public-settings'] });
+        setThemeSavedFlash(true);
+        setTimeout(() => setThemeSavedFlash(false), 2500);
+      })
+      .catch(() => {
+        // The existing mutation error area will remain available for save errors.
+      });
   };
 
   const handleAddCustom = (event: FormEvent) => {
@@ -354,37 +365,11 @@ export default function AdminSettingsPage() {
 
         {/* Theme */}
         <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">Theme</h2>
-              <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
-                Colors as HSL triplets, e.g. <code>202 34% 20%</code>.
-              </p>
-            </div>
-            <div className="inline-flex rounded-full bg-[hsl(var(--secondary))] p-1">
-              <button
-                type="button"
-                onClick={() => setActiveThemeTab('light')}
-                className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                  activeThemeTab === 'light'
-                    ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
-                    : 'text-[hsl(var(--muted-foreground))]'
-                }`}
-              >
-                Light
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveThemeTab('dark')}
-                className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                  activeThemeTab === 'dark'
-                    ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]'
-                    : 'text-[hsl(var(--muted-foreground))]'
-                }`}
-              >
-                Dark
-              </button>
-            </div>
+          <div>
+            <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">Theme colors</h2>
+            <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+              Change the single RotryAI color palette. This is not a light/dark mode switch.
+            </p>
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -392,26 +377,32 @@ export default function AdminSettingsPage() {
               <ColorField
                 key={key}
                 label={label}
-                value={(activeThemeTab === 'light' ? themeLight : themeDark)[key]}
-                onChange={(next) =>
-                  (activeThemeTab === 'light' ? setThemeLight : setThemeDark)((prev) => ({
-                    ...prev,
-                    [key]: next,
-                  }))
-                }
+                value={theme[key]}
+                onChange={(next) => setTheme((prev) => ({ ...prev, [key]: next }))}
               />
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={handleSaveTheme}
-            disabled={updateSettings.isPending}
-            className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))] disabled:opacity-70"
-          >
-            {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Save theme
-          </button>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setThemeConfirmAction('save')}
+              disabled={updateSettings.isPending}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))] disabled:opacity-70"
+            >
+              {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              Save theme
+            </button>
+            <button
+              type="button"
+              onClick={() => setThemeConfirmAction('reset')}
+              disabled={updateSettings.isPending}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--background))] px-5 text-sm font-bold text-[hsl(var(--foreground))] disabled:opacity-70"
+            >
+              Reset theme
+            </button>
+          </div>
+
           {updateSettings.isError && (
             <p className="mt-3 text-sm text-[hsl(var(--destructive))]">
               {updateSettings.error instanceof Error
@@ -423,6 +414,54 @@ export default function AdminSettingsPage() {
             <p className="mt-3 text-sm text-[hsl(var(--chart-3))]">Theme saved and applied.</p>
           )}
         </section>
+
+        {themeConfirmAction && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-5" role="dialog" aria-modal="true">
+            <div className="w-full max-w-[440px] rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="font-serif text-[22px] text-[hsl(var(--primary))]">
+                    {themeConfirmAction === 'save' ? 'Apply new theme?' : 'Reset theme?'}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-[hsl(var(--muted-foreground))]">
+                    {themeConfirmAction === 'save'
+                      ? 'This will change the RotryAI colors for everyone using the app.'
+                      : 'This will remove the custom theme and restore RotryAI to its original colors.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setThemeConfirmAction(null)}
+                  className="rounded-full p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))]"
+                  aria-label="Close confirmation"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setThemeConfirmAction(null)}
+                  className="min-h-10 rounded-full border border-[hsl(var(--border))] px-5 text-sm font-bold text-[hsl(var(--foreground))]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const action = themeConfirmAction;
+                    setThemeConfirmAction(null);
+                    if (action === 'save') handleSaveTheme();
+                    else handleResetTheme();
+                  }}
+                  className="min-h-10 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))]"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Users */}
         <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
