@@ -420,7 +420,7 @@ function Home() {
     queryKey: ['health'],
     queryFn: getHealth,
     retry: false,
-    staleTime: 60_000,
+    staleTime: 15_000,
   });
 
   const historyQuery = useQuery({
@@ -922,7 +922,7 @@ function ThemeLoader() {
   const { data } = useQuery({
     queryKey: ['public-settings'],
     queryFn: getPublicSettings,
-    staleTime: 60_000,
+    staleTime: 15_000,
   });
 
   useEffect(() => {
