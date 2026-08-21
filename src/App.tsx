@@ -26,6 +26,7 @@ import {
   getHealth,
   getHistory,
   getPublicSettings,
+  getUsage,
   type ExplainResult,
   type AnalysisHistoryItem,
 } from '@/lib/api';
@@ -429,6 +430,13 @@ function Home() {
     staleTime: 0,
   });
 
+  const usageQuery = useQuery({
+    queryKey: ['analysis-usage'],
+    queryFn: () => getUsage(token as string),
+    enabled: Boolean(token),
+    staleTime: 15_000,
+  });
+
   const deleteHistory = useMutation({
     mutationFn: (historyId: string) => deleteHistoryItem(token as string, historyId),
     onSuccess: () => {
@@ -484,7 +492,7 @@ function Home() {
       }
       setValidationError('');
       setResult(null);
-      explain.mutate({ text: cleanedText }, { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } });
+      explain.mutate({ text: cleanedText }, { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); queryClient.invalidateQueries({ queryKey: ['analysis-usage'] }); } });
       return;
     }
 
@@ -498,7 +506,7 @@ function Home() {
       const imageBase64 = await fileToBase64(imageFile);
       explain.mutate(
         { text: text.trim() || undefined, imageBase64, imageMimeType: imageFile.type },
-        { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); } },
+        { onSuccess: (data) => { setResult(data); queryClient.invalidateQueries({ queryKey: ['analysis-history'] }); queryClient.invalidateQueries({ queryKey: ['analysis-usage'] }); } },
       );
     } catch {
       setValidationError('Could not read that image. Please try another file.');
@@ -526,6 +534,14 @@ function Home() {
           </div>
         </div>
         <div className="flex items-center gap-4">
+          {usageQuery.data && (
+            <div
+              className="hidden rounded-full border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3 py-1.5 text-xs font-semibold text-[hsl(var(--muted-foreground))] sm:block"
+              title={`Daily: ${usageQuery.data.daily_used}/${usageQuery.data.daily_limit} · Monthly: ${usageQuery.data.monthly_used}/${usageQuery.data.monthly_limit}`}
+            >
+              {usageQuery.data.daily_remaining} today
+            </div>
+          )}
           <div className="hidden items-center gap-2 text-xs text-[hsl(var(--muted-foreground))] sm:flex" data-testid="status-connection">
             <span className={`h-2 w-2 rounded-full ${health.isLoading ? 'bg-[hsl(var(--accent))]' : health.isError ? 'bg-[hsl(var(--destructive))]' : 'bg-[hsl(var(--chart-3))]'}`} />
             <span>{health.isLoading ? 'Checking guide' : health.isError ? 'Guide offline' : 'Guide is ready'}</span>
