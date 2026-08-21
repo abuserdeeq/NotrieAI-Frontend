@@ -16,6 +16,8 @@ import { AdminRoute, ProtectedRoute } from '@/components/protected-route';
 import NotFound from '@/pages/not-found';
 import LoginPage from '@/pages/login';
 import SignupPage from '@/pages/signup';
+import ForgotPasswordPage from '@/pages/forgot-password';
+import ResetPasswordPage from '@/pages/reset-password';
 import AdminSettingsPage from '@/pages/admin-settings';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import {
@@ -789,6 +791,8 @@ function Router() {
       <Switch>
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
+        <Route path="/reset-password" component={ResetPasswordPage} />
         <Route path="/admin/settings">
           <AdminRoute>
             <AdminSettingsPage />
