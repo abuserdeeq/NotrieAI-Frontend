@@ -26,6 +26,7 @@ import { applyTheme, type ThemeColors } from '@/lib/theme';
 const THEME_FIELDS: { key: keyof ThemeColors; label: string }[] = [
   { key: 'background', label: 'Background' },
   { key: 'foreground', label: 'Text' },
+  { key: 'card', label: 'Card (most visible surface)' },
   { key: 'primary', label: 'Primary' },
   { key: 'primary_foreground', label: 'Primary text' },
   { key: 'secondary', label: 'Secondary' },
@@ -37,6 +38,7 @@ const THEME_FIELDS: { key: keyof ThemeColors; label: string }[] = [
 const EMPTY_THEME: ThemeColors = {
   background: '',
   foreground: '',
+  card: '',
   primary: '',
   primary_foreground: '',
   secondary: '',
