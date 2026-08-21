@@ -3,6 +3,7 @@ const STYLE_ELEMENT_ID = 'notrieai-dynamic-theme';
 export type ThemeColors = {
   background: string;
   foreground: string;
+  card: string;
   primary: string;
   primary_foreground: string;
   secondary: string;
@@ -14,6 +15,7 @@ export type ThemeColors = {
 const VAR_MAP: Record<keyof ThemeColors, string> = {
   background: '--background',
   foreground: '--foreground',
+  card: '--card',
   primary: '--primary',
   primary_foreground: '--primary-foreground',
   secondary: '--secondary',
