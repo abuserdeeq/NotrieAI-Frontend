@@ -156,3 +156,28 @@ export function getHistoryItem(token: string, historyId: string) {
 export function deleteHistoryItem(token: string, historyId: string) {
   return apiFetch<void>(`/api/history/${historyId}`, { method: 'DELETE' }, token);
 }
+
+// ---------------------------------------------------------------------
+// Password reset
+// ---------------------------------------------------------------------
+
+export function forgotPassword(email: string) {
+  return apiFetch<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, newPassword: string) {
+  return apiFetch<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Google sign-in
+// ---------------------------------------------------------------------
+// (Handled directly in src/lib/auth.tsx's loginWithGoogle, which calls
+// /api/auth/google via apiFetch and persists the resulting session the
+// same way login/signup do.)
