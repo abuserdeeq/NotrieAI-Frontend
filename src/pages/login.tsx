@@ -2,18 +2,32 @@ import { type FormEvent, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { LogoMark } from '@/components/brand';
+import { GoogleSignInButton } from '@/components/google-signin-button';
 import { useSiteSettings } from '@/hooks/use-site-settings';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const { siteName, siteTagline } = useSiteSettings();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+
+  const handleGoogleToken = async (idToken: string) => {
+    setError('');
+    setIsBusy(true);
+    try {
+      await loginWithGoogle(idToken);
+      setLocation('/');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not sign in with Google. Please try again.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,6 +89,15 @@ export default function LoginPage() {
             className="mt-2 w-full rounded-xl border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-3 text-[15px] text-[hsl(var(--foreground))] outline-none focus:border-[hsl(var(--primary))]"
           />
 
+          <div className="mt-2 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-semibold text-[hsl(var(--primary))] underline underline-offset-2"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
           {error && (
             <div className="mt-4 flex items-start gap-2 text-sm text-[hsl(var(--destructive))]" role="alert">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
@@ -92,6 +115,14 @@ export default function LoginPage() {
             {!isBusy && <ArrowRight size={16} />}
           </button>
         </form>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[hsl(var(--muted-foreground))]">or</span>
+          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+        </div>
+
+        <GoogleSignInButton text="signin_with" onToken={handleGoogleToken} onError={setError} />
 
         <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
           New here?{' '}

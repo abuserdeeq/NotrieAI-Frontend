@@ -2,18 +2,32 @@ import { type FormEvent, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { LogoMark } from '@/components/brand';
+import { GoogleSignInButton } from '@/components/google-signin-button';
 import { useSiteSettings } from '@/hooks/use-site-settings';
 import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 
 export default function SignupPage() {
   const { siteName, siteTagline } = useSiteSettings();
-  const { signup } = useAuth();
+  const { signup, loginWithGoogle } = useAuth();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isBusy, setIsBusy] = useState(false);
+
+  const handleGoogleToken = async (idToken: string) => {
+    setError('');
+    setIsBusy(true);
+    try {
+      await loginWithGoogle(idToken);
+      setLocation('/');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not sign up with Google. Please try again.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,6 +112,14 @@ export default function SignupPage() {
             {!isBusy && <ArrowRight size={16} />}
           </button>
         </form>
+
+        <div className="my-6 flex items-center gap-3">
+          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+          <span className="text-xs font-semibold uppercase tracking-[0.1em] text-[hsl(var(--muted-foreground))]">or</span>
+          <div className="h-px flex-1 bg-[hsl(var(--border))]" />
+        </div>
+
+        <GoogleSignInButton text="signup_with" onToken={handleGoogleToken} onError={setError} />
 
         <p className="mt-6 text-center text-sm text-[hsl(var(--muted-foreground))]">
           Already have an account?{' '}
