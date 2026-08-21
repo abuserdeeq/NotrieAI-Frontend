@@ -129,11 +129,15 @@ export default function AdminSettingsPage() {
   const [newValue, setNewValue] = useState('');
   const [siteName, setSiteName] = useState('Rotryai');
   const [siteTagline, setSiteTagline] = useState('Understand anything in seconds.');
+  const [dailyQuota, setDailyQuota] = useState('10');
+  const [monthlyQuota, setMonthlyQuota] = useState('300');
 
   useEffect(() => {
     if (!settingsQuery.data) return;
     setSiteName(settingsQuery.data.site_name ?? 'Rotryai');
     setSiteTagline(settingsQuery.data.site_tagline ?? 'Understand anything in seconds.');
+    setDailyQuota(settingsQuery.data.quota_daily_analyses ?? '10');
+    setMonthlyQuota(settingsQuery.data.quota_monthly_analyses ?? '300');
     try {
       if (settingsQuery.data.theme_light) {
         setThemeLight({ ...EMPTY_THEME, ...JSON.parse(settingsQuery.data.theme_light) });
@@ -304,6 +308,48 @@ export default function AdminSettingsPage() {
                 : 'Could not save. Please try again.'}
             </p>
           )}
+        </section>
+
+        {/* Usage quota */}
+        <section className="rounded-[24px] border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6 sm:p-8">
+          <h2 className="font-serif text-[22px] text-[hsl(var(--primary))]">Analysis quota</h2>
+          <p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">
+            Set the maximum AI analyses allowed per account. This works alongside the existing 5/minute and 20/hour rate limits.
+          </p>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label>
+              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Daily analyses</span>
+              <input
+                type="number"
+                min="0"
+                value={dailyQuota}
+                onChange={(event) => setDailyQuota(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-semibold text-[hsl(var(--muted-foreground))]">Monthly analyses</span>
+              <input
+                type="number"
+                min="0"
+                value={monthlyQuota}
+                onChange={(event) => setMonthlyQuota(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm outline-none focus:border-[hsl(var(--primary))]"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateSettings.mutate({
+              quota_daily_analyses: String(Math.max(0, Number.parseInt(dailyQuota, 10) || 0)),
+              quota_monthly_analyses: String(Math.max(0, Number.parseInt(monthlyQuota, 10) || 0)),
+            })}
+            disabled={updateSettings.isPending}
+            className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[hsl(var(--accent))] px-5 text-sm font-bold text-[hsl(var(--accent-foreground))] disabled:opacity-70"
+          >
+            {updateSettings.isPending ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Save quota
+          </button>
         </section>
 
         {/* Theme */}
