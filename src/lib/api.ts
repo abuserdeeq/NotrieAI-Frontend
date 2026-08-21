@@ -59,6 +59,15 @@ export type ExplainResult = {
   what_you_should_do: string[];
 };
 
+export type UsageInfo = {
+  daily_used: number;
+  daily_limit: number;
+  daily_remaining: number;
+  monthly_used: number;
+  monthly_limit: number;
+  monthly_remaining: number;
+};
+
 export type UserAdminOut = {
   id: string;
   email: string;
@@ -86,6 +95,11 @@ export function explainRequest(
     },
     token,
   );
+}
+
+
+export function getUsage(token: string) {
+  return apiFetch<UsageInfo>('/api/usage', {}, token);
 }
 
 export function getHealth() {
